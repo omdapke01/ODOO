@@ -1,0 +1,604 @@
+# Intelligent Reimbursement Management System Logic
+
+This document explains what the web app does, how it is supposed to be used, how each role behaves, and how the current prototype is implemented.
+
+## 1. What This Web App Is
+
+This is a multi-tenant reimbursement management system.
+
+Multi-tenant means:
+- each company has its own users
+- each company has its own expenses
+- each company has its own approval rules
+- users from one company should not manage or view another company’s data
+
+The purpose of the app is to let employees submit expenses, route them through a dynamic approval flow, convert all amounts into the company’s base currency, and keep status visibility for everyone involved.
+
+## 2. Main Parts of the System
+
+The app has two main parts:
+
+- `client`
+  This is the React + Tailwind frontend. It provides the UI, navigation, forms, tables, and dashboard.
+
+- `server`
+  This is the Node.js + Express backend. It handles authentication, authorization, expense creation, OCR, rule evaluation, approval actions, and database access.
+
+Database:
+- Prisma ORM is used in the backend code.
+- For the working prototype, the app is currently using a local SQLite database file:
+  `server/prisma/dev.db`
+
+## 3. High-Level Flow
+
+The normal usage flow is:
+
+1. A company admin signs up.
+2. The admin creates more users inside the company.
+3. Employees submit expense claims.
+4. The system determines the correct approval rule from the database.
+5. The system creates approval records for the correct approvers.
+6. Managers and/or admins approve or reject.
+7. The expense status updates to `PENDING`, `APPROVED`, or `REJECTED`.
+
+## 4. Authentication and Tenancy
+
+Authentication is JWT-based.
+
+How it works:
+- user signs up or logs in
+- backend validates credentials
+- backend returns a JWT token
+- frontend stores that token in local storage
+- frontend sends the token in the `Authorization: Bearer <token>` header
+- backend middleware reads the token and attaches user identity to the request
+
+The token includes:
+- user id
+- role
+- company id
+- name
+- email
+
+Why this matters:
+- every protected request knows who the user is
+- every query can be filtered by `companyId`
+- role checks can be enforced in middleware and controllers
+
+## 5. Roles and Differences
+
+There are three main roles.
+
+### Admin
+
+Admin is the highest operational role in the current app.
+
+Admin can:
+- create the company through signup
+- log in
+- create users
+- view all company expenses
+- define approval rules
+- approve or reject expenses assigned to them
+- view dashboards and company-wide summaries
+
+Admin is used for:
+- system ownership inside a company
+- policy setup
+- oversight
+- final or special approvals when rules require admin involvement
+
+### Manager
+
+Manager is the team-level approver role.
+
+Manager can:
+- log in
+- view their own expenses
+- view expenses submitted by their direct reports
+- approve or reject expenses assigned to them
+- view rules
+- view users list
+
+Manager cannot:
+- create users in the current implementation
+- create approval rules
+
+Manager is used for:
+- first-line review
+- team-level expense oversight
+- sequential or hybrid approval participation
+
+### Employee
+
+Employee is the submitter role.
+
+Employee can:
+- log in
+- submit expenses
+- upload receipts
+- use OCR-assisted autofill
+- view their own expenses and statuses
+
+Employee cannot:
+- create users
+- define rules
+- approve expenses unless deliberately assigned a role/rule that would allow that in a future version
+
+Employee is used for:
+- expense creation
+- receipt submission
+- reimbursement tracking
+
+## 6. Role Behavior in the UI
+
+The same app shell is shared across roles, but what users can actually do depends on backend permissions and some frontend restrictions.
+
+Examples:
+- the `Users` page shows the creation form only for admins
+- the `Rules` page shows the creation form only for admins
+- employees mainly use the `Expenses` page to submit and track their claims
+- managers and admins see actionable approvals inside the expense feed
+
+## 7. Data Model and What Each Table Means
+
+The database contains the following logical entities.
+
+### Company
+
+Stores:
+- company identity
+- base currency
+- creation timestamp
+
+Purpose:
+- separates tenants
+- defines the target currency for conversion
+
+### User
+
+Stores:
+- name
+- email
+- password hash
+- role
+- company
+- optional manager relationship
+
+Purpose:
+- handles login identity
+- defines permissions
+- supports manager hierarchy
+
+### Expense
+
+Stores:
+- submitter
+- original amount and currency
+- converted amount in company currency
+- category
+- description
+- date
+- merchant name if OCR finds it
+- receipt path
+- workflow status
+
+Purpose:
+- main reimbursement record
+
+### Approval
+
+Stores:
+- expense id
+- approver id
+- status
+- comments
+- step order
+- action timestamp
+
+Purpose:
+- tracks who must approve
+- tracks where the expense is in the approval chain
+
+### ApprovalRule
+
+Stores:
+- company id
+- rule type
+- percentage requirement
+- specific approver role
+- min amount
+- max amount
+
+Purpose:
+- keeps approval logic database-driven
+- avoids hardcoding a single approval path
+
+### AuditLog
+
+Stores:
+- action name
+- actor
+- related expense
+- metadata
+- timestamp
+
+Purpose:
+- records major events for traceability
+
+## 8. Expense Submission Logic
+
+When an employee submits an expense:
+
+1. frontend sends the form to the backend
+2. backend validates the request
+3. backend uploads the receipt if provided
+4. backend optionally runs OCR on the receipt
+5. backend converts amount into company base currency
+6. backend creates the expense record
+7. backend builds approval records using database rules
+8. backend updates expense status to `PENDING` if approvals exist
+
+What is stored:
+- original amount
+- original currency
+- converted amount
+- category
+- description
+- date
+- receipt URL
+- OCR merchant data if available
+
+## 9. OCR Logic
+
+OCR is handled with Tesseract.js.
+
+What happens:
+- user uploads an image or PDF receipt
+- frontend can call the OCR endpoint before final submission
+- backend reads text from the receipt
+- backend tries to extract:
+  - amount
+  - date
+  - merchant name
+
+Why this exists:
+- reduces manual typing
+- makes the prototype more useful in a demo
+
+Important note:
+- OCR is best-effort
+- it will not always be correct
+- users should still verify the values before submitting
+
+## 10. Currency Conversion Logic
+
+Every company has a base currency.
+
+Example:
+- company base currency = `INR`
+- employee submits `USD 120`
+- system converts it to INR
+- system stores both original amount and converted amount
+
+Why this matters:
+- all reporting becomes consistent
+- approval thresholds can be evaluated in one common currency
+
+Current behavior:
+- if exchange API key is present, the backend attempts real conversion
+- if exchange API key is missing, fallback behavior stores the numeric amount as-is and marks it as a fallback in the conversion result
+
+This is acceptable for a prototype, but production should use a valid exchange API key.
+
+## 11. Approval Engine Logic
+
+This is the core logic of the app.
+
+The important rule is:
+- approval flow is not hardcoded
+- it is chosen from the database based on company rules and amount range
+
+### Step A: Resolve the Rule
+
+When an expense is created:
+- backend reads all approval rules for the company
+- backend finds the first rule whose min/max range matches the converted expense amount
+- if no exact match exists, it falls back to the first available rule
+
+### Step B: Resolve the Approvers
+
+The system collects approvers using:
+- employee’s manager, if one exists
+- specific role-based approvers, if the rule requires them
+- otherwise admins as default fallback approvers
+
+Approvers are deduplicated so one person is not added twice.
+
+### Step C: Create Approval Rows
+
+Approval records are created in the `Approval` table.
+
+How `stepOrder` works:
+- `SEQUENTIAL`: each approver gets a different step order
+- other rule types currently use the same step order
+
+### Step D: Process Decisions
+
+When an approver clicks approve or reject:
+- backend checks the approval assignment
+- backend ensures it belongs to the same company
+- backend verifies sequential order if necessary
+- backend updates the approver’s approval row
+- backend recalculates the final expense status
+
+### Step E: Finalize Expense Status
+
+The system then checks:
+- whether any approver rejected
+- how many approvers approved
+- whether percentage thresholds are met
+- whether a required specific role has approved
+
+Based on that, expense becomes:
+- `APPROVED`
+- `REJECTED`
+- or remains `PENDING`
+
+## 12. Rule Types and Their Meaning
+
+### Sequential
+
+Meaning:
+- approvers must act one after another
+- later approvers should not act before earlier ones
+
+Current implementation:
+- uses increasing `stepOrder`
+- checks whether earlier pending steps still exist
+
+### Parallel
+
+Meaning:
+- all assigned approvers can act independently at the same stage
+
+Current implementation:
+- all are placed in the same step
+- expense is approved when all required approvals are done
+
+### Conditional
+
+Meaning:
+- approval can be completed when a percentage threshold is reached
+- or when a specific important approver approves
+
+Example:
+- if 60% approvals are reached, approve
+- if admin approves, approve
+
+### Hybrid
+
+Meaning:
+- combines multiple conditions
+
+Current implementation:
+- percentage threshold must be satisfied
+- and the specific approver role must also approve if configured
+
+## 13. Expense Statuses
+
+Logical workflow statuses used by the app:
+
+- `DRAFT`
+- `SUBMITTED`
+- `PENDING`
+- `APPROVED`
+- `REJECTED`
+
+How they are used in practice:
+- expense is created as submitted
+- if approvals are generated, it moves to pending
+- if rejected by any required approver, it becomes rejected
+- if all approval conditions are satisfied, it becomes approved
+
+## 14. Dashboard Logic
+
+The dashboard summarizes company expense activity.
+
+Current metrics:
+- total expenses
+- pending approvals for current approver
+- user count
+- approved expense count
+- category breakdown
+- monthly trend
+
+How it is computed:
+- backend aggregates expense values from the database
+- frontend visualizes them using charts and progress bars
+
+## 15. How the Frontend Works
+
+Frontend is built with:
+- React
+- React Router
+- Tailwind CSS
+
+Main pages:
+- Login
+- Signup
+- Dashboard
+- Expenses
+- Users
+- Rules
+
+Main frontend responsibilities:
+- render forms and tables
+- store auth token in local storage
+- send authenticated API requests
+- provide navigation by role
+- display approval actions and summaries
+
+Design direction:
+- soft theme
+- light gradients
+- muted colors
+- easy-to-navigate sidebar
+- simple cards and tables for hackathon demo clarity
+
+## 16. How the Backend Works
+
+Backend is built with:
+- Node.js
+- Express
+- Prisma Client
+
+Main backend responsibilities:
+- auth
+- RBAC
+- receipt upload
+- OCR
+- currency conversion
+- dynamic approval generation
+- approval state transitions
+- audit logging
+
+Route groups:
+- `/api/auth`
+- `/api/users`
+- `/api/expenses`
+- `/api/approvals`
+- `/api/rules`
+
+## 17. How the Prototype Runs Right Now
+
+The current working prototype uses:
+- frontend dev server on port `5173`
+- backend API on port `4000`
+- SQLite database file at:
+  `server/prisma/dev.db`
+
+This means:
+- no PostgreSQL setup is required for the prototype
+- app can run locally with only Node.js and npm
+
+## 18. How to Start the App
+
+### Backend
+
+From:
+- `W:\odoo\server`
+
+Run:
+- `npm install`
+- `npm run dev`
+
+### Frontend
+
+From:
+- `W:\odoo\client`
+
+Run:
+- `npm install`
+- `npm run dev`
+
+Open:
+- `http://localhost:5173`
+
+## 19. Default Seed Users
+
+The prototype includes seeded demo users:
+
+- Admin
+  - email: `admin@acme.com`
+  - password: `password123`
+
+- Manager
+  - email: `manager@acme.com`
+  - password: `password123`
+
+- Employee
+  - email: `employee@acme.com`
+  - password: `password123`
+
+## 20. How Someone Should Use It
+
+### If you are an Admin
+
+1. log in
+2. review dashboard
+3. create users
+4. create or adjust approval rules
+5. review expenses
+6. approve or reject expenses assigned to you
+
+### If you are a Manager
+
+1. log in
+2. open expenses
+3. review team expense claims
+4. approve or reject assigned claims
+5. monitor team activity
+
+### If you are an Employee
+
+1. log in
+2. open expenses
+3. fill expense form
+4. upload receipt
+5. review OCR-assisted fields
+6. submit
+7. monitor status changes
+
+## 21. Why This Design Was Chosen
+
+This prototype was built to satisfy hackathon-style goals:
+
+- simple local setup
+- easy demo flow
+- visible approval engine
+- role-based behavior
+- clear navigation
+- enough backend logic to prove the idea
+
+Using SQLite for the prototype reduces friction and keeps the app runnable without external database setup.
+
+Keeping rules in the database instead of hardcoding them makes the project stronger conceptually and closer to a real enterprise workflow system.
+
+## 22. Current Prototype Limits
+
+Important limitations in the current version:
+
+- real-time notifications are not implemented yet
+- fraud detection is not implemented yet
+- OCR is best-effort only
+- exchange conversion fallback is basic if no API key is provided
+- override approvals are not yet a dedicated admin action
+- SQLite is used for prototype simplicity instead of PostgreSQL
+
+## 23. What Would Be Next for Production
+
+If this were extended beyond prototype stage, the next upgrades should be:
+
+- restore PostgreSQL as primary database
+- use proper Prisma migrations end-to-end
+- add Socket.io for real-time notifications
+- add stronger file storage strategy
+- add duplicate receipt detection
+- add admin override workflow
+- add better manager tree handling beyond direct reports
+- add better analytics and export
+- add test coverage for approval rules
+
+## 24. Final Summary
+
+This app is a reimbursement workflow platform.
+
+Employees submit expenses.
+Managers and admins review them.
+Rules stored in the database decide how approvals work.
+All expenses are normalized into the company currency.
+The frontend gives a clean soft-themed interface.
+The backend enforces auth, roles, approval logic, and data separation.
+
+For the current prototype, everything runs locally using React, Express, Prisma client, and a SQLite database file.
