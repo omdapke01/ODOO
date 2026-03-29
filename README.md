@@ -96,7 +96,7 @@ Go to:
 ## Important Notes
 
 - OCR is helpful but not required. If it cannot read a receipt, you can still enter the fields manually.
-- Currency conversion is supported, but for full live conversion you should provide an exchange rate API key in the backend `.env`.
+- Currency conversion is supported, but for full live conversion we got to add API
 - This is currently a working prototype made for local use and demonstration.
 
 ## Extra Documentation
