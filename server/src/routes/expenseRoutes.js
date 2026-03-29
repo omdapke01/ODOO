@@ -16,10 +16,10 @@ router.post(
   validateBody(
     z.object({
       amount: z.coerce.number().positive(),
-      currency: z.string().length(3),
-      category: z.string().min(2),
-      description: z.string().min(3),
-      date: z.string(),
+      currency: z.string().trim().length(3),
+      category: z.string().trim().min(1),
+      description: z.string().trim().min(1),
+      date: z.string().trim().min(1),
     })
   ),
   createExpense

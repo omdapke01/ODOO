@@ -98,3 +98,9 @@ Go to:
 - OCR is helpful but not required. If it cannot read a receipt, you can still enter the fields manually.
 - Currency conversion is supported, but for full live conversion you should provide an exchange rate API key in the backend `.env`.
 - This is currently a working prototype made for local use and demonstration.
+
+## Extra Documentation
+
+If you want a full explanation of how the app works, read:
+
+- [Logic](W:\odoo\Logic)

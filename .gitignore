@@ -8,3 +8,4 @@ server/uploads
 server/prisma/dev.db
 server/prisma/dev.db-journal
 *.log
+~$*

@@ -13,9 +13,14 @@ async function createExpense(req, res) {
 
   const conversion = await convertToBaseCurrency({ amount, currency, companyId: req.user.companyId });
   let ocrData = null;
+  let ocrWarning = null;
 
   if (req.file) {
-    ocrData = await parseReceipt(req.file.path);
+    try {
+      ocrData = await parseReceipt(req.file.path);
+    } catch (_error) {
+      ocrWarning = "Receipt was uploaded, but OCR could not read it. The expense was still submitted.";
+    }
   }
 
   const expense = await prisma.expense.create({
@@ -42,10 +47,10 @@ async function createExpense(req, res) {
     action: "EXPENSE_SUBMITTED",
     userId: req.user.sub,
     expenseId: expense.id,
-    metadata: { conversionRate: conversion.rate, ocrData },
+    metadata: { conversionRate: conversion.rate, ocrData, ocrWarning },
   });
 
-  return res.status(201).json({ ...expense, ocrData, conversion });
+  return res.status(201).json({ ...expense, ocrData, ocrWarning, conversion });
 }
 
 async function listExpenses(req, res) {
@@ -130,8 +135,18 @@ async function extractReceipt(req, res) {
     return res.status(400).json({ message: "Receipt file is required." });
   }
 
-  const data = await parseReceipt(req.file.path);
-  return res.json(data);
+  try {
+    const data = await parseReceipt(req.file.path);
+    return res.json(data);
+  } catch (_error) {
+    return res.json({
+      amount: null,
+      date: null,
+      merchantName: null,
+      rawText: "",
+      warning: "OCR could not read this receipt. You can still enter the fields manually and submit the expense.",
+    });
+  }
 }
 
 module.exports = { createExpense, listExpenses, getExpenseById, getDashboard, extractReceipt };
