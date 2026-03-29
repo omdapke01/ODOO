@@ -99,5 +99,27 @@ Go to:
 - Currency conversion is supported, but for full live conversion we got to add API
 - This is currently a working prototype made for local use and demonstration.
 
-## Extra Documentation
+## Rules
 
+The Rules tab controls how an expense gets approved.
+
+It lets the admin decide:
+
+which approval style to use
+which expense amounts the rule applies to
+whether a manager or admin must approve
+whether all approvals are needed or only a percentage
+In simple terms, rules tell the system what path an expense should follow after it is submitted.
+
+What the fields mean:
+
+Type: decides the approval style, like one-by-one or condition-based
+Threshold: used when only part of the approvers are enough, like 60%
+Specific role: tells the system if a special role like Admin or Manager must be included
+Min: the smallest expense amount this rule applies to
+Max: the biggest expense amount this rule applies to
+Example:
+
+if a rule says SEQUENTIAL, MANAGER, 0 to 5000, then any expense in that amount range goes to the manager for approval
+if a rule says HYBRID, 0.6, ADMIN, 5000+, then larger expenses need a stronger approval condition and admin involvement
+So the Rules tab is basically the company’s approval policy setup page.
