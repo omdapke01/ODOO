@@ -20,17 +20,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,_#edf5f8,_#f8efe7)] px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-[2rem] border border-white/70 bg-white/80 p-8 shadow-soft backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Welcome back</p>
-        <h1 className="mt-2 text-3xl font-semibold text-ink">Sign in</h1>
+    <div className="flex min-h-screen items-center justify-center bg-app-wash px-4 py-8">
+      <form onSubmit={handleSubmit} className="panel w-full max-w-md p-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Welcome back</p>
+        <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-ink">Sign in</h1>
+        <p className="mt-3 text-sm leading-7 text-slate-500">Review submissions, process approvals, and manage policies from one calm workspace.</p>
         <div className="mt-6 space-y-4">
-          <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none" placeholder="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <input className="field" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <input className="field" placeholder="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           {error ? <p className="text-sm text-rose-500">{error}</p> : null}
-          <button className="w-full rounded-2xl bg-ink px-4 py-3 text-white">Login</button>
+          <button className="button-primary w-full">Login</button>
         </div>
-        <p className="mt-6 text-sm text-slate-500">New company? <Link className="text-ink underline" to="/signup">Create account</Link></p>
+        <div className="mt-6 rounded-2xl bg-shell/80 p-4 text-sm text-slate-600">
+          Demo seed users live in the backend seeder if you want a quick start.
+        </div>
+        <p className="mt-6 text-sm text-slate-500">New company? <Link className="font-medium text-ink underline" to="/signup">Create account</Link></p>
       </form>
     </div>
   );

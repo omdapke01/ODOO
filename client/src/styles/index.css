@@ -7,10 +7,18 @@
   background: #f8fbfd;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
   color: #243447;
+  background:
+    radial-gradient(circle at top left, rgba(139, 184, 217, 0.22), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(214, 191, 168, 0.18), transparent 26%),
+    linear-gradient(180deg, #f8fbfd 0%, #f8f3ee 100%);
 }
 
 * {
@@ -22,4 +30,63 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+input,
+textarea,
+select {
+  @apply outline-none transition duration-200;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  @apply border-ocean ring-4 ring-ocean/15;
+}
+
+::selection {
+  background: rgba(139, 184, 217, 0.28);
+  color: #243447;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-[2rem] border border-white/70 bg-white/80 shadow-soft backdrop-blur;
+  }
+
+  .panel-soft {
+    @apply rounded-3xl border border-white/70 bg-white/70 shadow-panel backdrop-blur;
+  }
+
+  .field {
+    @apply w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-ink placeholder:text-slate-400;
+  }
+
+  .button-primary {
+    @apply rounded-2xl bg-ink px-4 py-3 font-medium text-white transition hover:opacity-95;
+  }
+
+  .button-secondary {
+    @apply rounded-2xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 transition hover:bg-slate-50;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+  }
+
+  .badge-success {
+    @apply badge bg-sage/25 text-ink;
+  }
+
+  .badge-info {
+    @apply badge bg-ocean/20 text-ink;
+  }
+
+  .badge-warm {
+    @apply badge bg-clay/30 text-ink;
+  }
+
+  .badge-muted {
+    @apply badge bg-slate-100 text-slate-600;
+  }
 }

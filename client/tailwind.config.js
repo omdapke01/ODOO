@@ -14,9 +14,14 @@ export default {
       },
       boxShadow: {
         soft: "0 24px 60px rgba(36, 52, 71, 0.08)",
+        panel: "0 18px 40px rgba(36, 52, 71, 0.06)",
       },
       fontFamily: {
-        sans: ["'Segoe UI'", "system-ui", "sans-serif"],
+        sans: ["Manrope", "'Segoe UI'", "system-ui", "sans-serif"],
+      },
+      backgroundImage: {
+        "app-wash":
+          "radial-gradient(circle at top left, rgba(139,184,217,0.24), transparent 28%), radial-gradient(circle at bottom right, rgba(214,191,168,0.18), transparent 24%), linear-gradient(180deg, #f8fbfd 0%, #f8f3ee 100%)",
       },
     },
   },

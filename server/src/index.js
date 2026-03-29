@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 require("express-async-errors");
 
 const { port, clientUrl } = require("./config/env");
@@ -26,6 +27,16 @@ app.use("/api/users", requireAuth, userRoutes);
 app.use("/api/expenses", requireAuth, expenseRoutes);
 app.use("/api/approvals", requireAuth, approvalRoutes);
 app.use("/api/rules", requireAuth, ruleRoutes);
+
+const clientDistPath = path.resolve(__dirname, "../../client/dist");
+
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+
+  app.get(/^\/(?!api|uploads).*/, (_req, res) => {
+    res.sendFile(path.join(clientDistPath, "index.html"));
+  });
+}
 
 app.use((error, _req, res, _next) => {
   console.error(error);

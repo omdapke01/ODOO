@@ -20,6 +20,11 @@ async function createUser(req, res) {
       managerId: managerId || null,
       companyId: req.user.companyId,
     },
+    include: {
+      manager: {
+        select: { id: true, name: true, email: true },
+      },
+    },
   });
 
   await createAuditLog({ action: "USER_CREATED", userId: req.user.sub, metadata: { createdUserId: user.id, role } });
@@ -29,7 +34,21 @@ async function createUser(req, res) {
 async function listUsers(req, res) {
   const users = await prisma.user.findMany({
     where: { companyId: req.user.companyId },
-    select: { id: true, name: true, email: true, role: true, managerId: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      managerId: true,
+      createdAt: true,
+      manager: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
 
