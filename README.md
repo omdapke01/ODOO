@@ -101,6 +101,3 @@ Go to:
 
 ## Extra Documentation
 
-If you want a full explanation of how the app works, read:
-
-- [Logic](W:\odoo\Logic)
