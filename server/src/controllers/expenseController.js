@@ -5,7 +5,22 @@ const { parseReceipt } = require("../services/ocrService");
 const { createAuditLog } = require("../utils/audit");
 
 const ApprovalDecision = { PENDING: "PENDING" };
-const WorkflowStatus = { SUBMITTED: "SUBMITTED", APPROVED: "APPROVED" };
+const WorkflowStatus = { SUBMITTED: "SUBMITTED", APPROVED: "APPROVED", PENDING: "PENDING" };
+
+function buildExpenseVisibilityWhere(reqUser, reportIds = []) {
+  if (reqUser.role === "EMPLOYEE") {
+    return { companyId: reqUser.companyId, userId: reqUser.sub };
+  }
+
+  if (reqUser.role === "MANAGER") {
+    return {
+      companyId: reqUser.companyId,
+      OR: [{ userId: reqUser.sub }, { userId: { in: reportIds } }],
+    };
+  }
+
+  return { companyId: reqUser.companyId };
+}
 
 async function createExpense(req, res) {
   const { amount, currency, category, description, date } = req.body;
@@ -54,19 +69,14 @@ async function createExpense(req, res) {
 }
 
 async function listExpenses(req, res) {
-  const where = { companyId: req.user.companyId };
-
-  if (req.user.role === "EMPLOYEE") {
-    where.userId = req.user.sub;
-  }
-
+  let reportIds = [];
   if (req.user.role === "MANAGER") {
     const reports = await prisma.user.findMany({ where: { managerId: req.user.sub }, select: { id: true } });
-    where.OR = [{ userId: req.user.sub }, { userId: { in: reports.map((item) => item.id) } }];
+    reportIds = reports.map((item) => item.id);
   }
 
   const expenses = await prisma.expense.findMany({
-    where,
+    where: buildExpenseVisibilityWhere(req.user, reportIds),
     include: {
       user: { select: { name: true, email: true } },
       approvals: {
@@ -100,12 +110,29 @@ async function getExpenseById(req, res) {
 }
 
 async function getDashboard(req, res) {
+  let reportIds = [];
+  if (req.user.role === "MANAGER") {
+    const reports = await prisma.user.findMany({ where: { managerId: req.user.sub }, select: { id: true } });
+    reportIds = reports.map((item) => item.id);
+  }
+
+  const visibleExpenseWhere = buildExpenseVisibilityWhere(req.user, reportIds);
+
   const [expenses, pendingApprovals, users] = await Promise.all([
     prisma.expense.findMany({
-      where: { companyId: req.user.companyId },
+      where: visibleExpenseWhere,
       select: { convertedAmount: true, category: true, createdAt: true, status: true },
     }),
-    prisma.approval.count({ where: { approverId: req.user.sub, status: ApprovalDecision.PENDING } }),
+    prisma.approval.count({
+      where: {
+        approverId: req.user.sub,
+        status: ApprovalDecision.PENDING,
+        expense: {
+          companyId: req.user.companyId,
+          status: WorkflowStatus.PENDING,
+        },
+      },
+    }),
     prisma.user.count({ where: { companyId: req.user.companyId } }),
   ]);
 

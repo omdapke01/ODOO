@@ -3,7 +3,7 @@ const { createAuditLog } = require("../utils/audit");
 
 const ApprovalDecision = { PENDING: "PENDING", APPROVED: "APPROVED", REJECTED: "REJECTED" };
 const ApprovalRuleType = { SEQUENTIAL: "SEQUENTIAL", CONDITIONAL: "CONDITIONAL", HYBRID: "HYBRID", PARALLEL: "PARALLEL" };
-const UserRole = { ADMIN: "ADMIN" };
+const UserRole = { ADMIN: "ADMIN", MANAGER: "MANAGER" };
 const WorkflowStatus = { APPROVED: "APPROVED", PENDING: "PENDING", REJECTED: "REJECTED" };
 
 function inRuleRange(rule, amount) {
@@ -24,19 +24,34 @@ async function resolveRule(companyId, amount) {
 async function resolveApprovers(user, rule) {
   const approvers = [];
 
+  let directManager = null;
   if (user.managerId) {
-    const manager = await prisma.user.findUnique({ where: { id: user.managerId } });
-    if (manager) approvers.push(manager);
+    directManager = await prisma.user.findUnique({ where: { id: user.managerId } });
+    if (directManager) {
+      approvers.push(directManager);
+    }
   }
 
-  if (rule?.specificApproverRole) {
-    const specificUsers = await prisma.user.findMany({
-      where: { companyId: user.companyId, role: rule.specificApproverRole },
-    });
-    approvers.push(...specificUsers);
-  } else {
+  if (rule?.specificApproverRole === UserRole.MANAGER) {
+    if (!directManager) {
+      const fallbackManager = await prisma.user.findFirst({
+        where: { companyId: user.companyId, role: UserRole.MANAGER },
+        orderBy: { createdAt: "asc" },
+      });
+      if (fallbackManager) {
+        approvers.push(fallbackManager);
+      }
+    }
+  } else if (rule?.specificApproverRole === UserRole.ADMIN) {
     const admins = await prisma.user.findMany({
       where: { companyId: user.companyId, role: UserRole.ADMIN },
+      orderBy: { createdAt: "asc" },
+    });
+    approvers.push(...admins);
+  } else if (!rule?.specificApproverRole) {
+    const admins = await prisma.user.findMany({
+      where: { companyId: user.companyId, role: UserRole.ADMIN },
+      orderBy: { createdAt: "asc" },
     });
     approvers.push(...admins);
   }
@@ -99,7 +114,7 @@ async function finalizeExpenseIfReady(expenseId, actorId) {
   const total = approvals.length || 1;
   const ratio = approved.length / total;
   const specificApproved = rule?.specificApproverRole && approvals.some((item) => item.status === ApprovalDecision.APPROVED && item.approver.role === rule.specificApproverRole);
-  const allApproved = approvals.every((item) => item.status === ApprovalDecision.APPROVED);
+  const allApproved = approvals.length > 0 && approvals.every((item) => item.status === ApprovalDecision.APPROVED);
   const thresholdMet = rule?.percentageRequired != null ? ratio >= rule.percentageRequired : false;
 
   let shouldApprove = false;
@@ -124,6 +139,7 @@ async function finalizeExpenseIfReady(expenseId, actorId) {
     return WorkflowStatus.APPROVED;
   }
 
+  await prisma.expense.update({ where: { id: expenseId }, data: { status: WorkflowStatus.PENDING } });
   return WorkflowStatus.PENDING;
 }
 
